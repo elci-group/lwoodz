@@ -1,0 +1,67 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH lwoodz-cli 1  "lwoodz-cli 0.4.8" 
+.SH NAME
+lwoodz\-cli \- CLI companion for the lwoodz licensing daemon
+.SH SYNOPSIS
+\fBlwoodz\-cli\fR [\fB\-c\fR|\fB\-\-config\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+CLI companion for the lwoodz licensing daemon
+.SH OPTIONS
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fI<PATH>\fR
+
+.TP
+\fB\-\-json\fR
+Output as JSON (must come before the subcommand, e.g. `lwoodz\-cli \-\-json audit`)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+lwoodz\-cli\-init(1)
+Create lwoodz.toml in the current directory
+.TP
+lwoodz\-cli\-remedy(1)
+Audit the repository and apply contextualised fixes to its legal documents (LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES, SPDX manifest, source headers). Uses `ami` project analysis, when available, as a context clue for missing metadata
+.TP
+lwoodz\-cli\-audit(1)
+Run a full compliance audit
+.TP
+lwoodz\-cli\-check(1)
+Check dependency license compatibility only
+.TP
+lwoodz\-cli\-licenses(1)
+List known SPDX license identifiers
+.TP
+lwoodz\-cli\-compat(1)
+Check whether two SPDX identifiers are compatible
+.TP
+lwoodz\-cli\-detect(1)
+Detect the SPDX license of a LICENSE file
+.TP
+lwoodz\-cli\-explain(1)
+Explain an SPDX license (uses Groq if GROQ_API_KEY is set)
+.TP
+lwoodz\-cli\-headers(1)
+Insert/update copyright + SPDX headers in source files
+.TP
+lwoodz\-cli\-dual(1)
+Generate a dual\-licensed variant
+.TP
+lwoodz\-cli\-status(1)
+Show daemon and repository status
+.TP
+lwoodz\-cli\-version(1)
+Print the version
+.TP
+lwoodz\-cli\-completions(1)
+Print a shell completion script to stdout
+.TP
+lwoodz\-cli\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH VERSION
+v0.4.8

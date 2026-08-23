@@ -23,7 +23,7 @@ The canonical licensing daemon for a repository — governs legal state the way 
 - **Dual / commercial variants** — `lwoodz-cli dual Apache-2.0` produces a dual-licensed file.
 - **Audit** — pre-release gate: license file presence, SPDX validity, dependency compatibility, header coverage. Machine-readable JSON + `audit.jsonl` log.
 - **Contributors / DCO** — maintains `.lwoodz/contributors.json`.
-- **Daemon** — `lwoodz --daemon` watches manifests and keeps legal state continuously consistent (observe vs enforce).
+- **Daemon** — `lwoodz daemon` watches manifests and keeps legal state continuously consistent (observe vs enforce).
 - **Inference** — optional AI-assisted advice via `GROQ_API_KEY` (Groq OpenAI-compatible API, `llama-3.3-70b-versatile` default).
 
 ## Install
@@ -39,7 +39,7 @@ sudo cp target/release/lwoodz target/release/lwoodz-cli /usr/local/bin/
 
 ```bash
 # 1. Initialize config
-lwoodz --init
+lwoodz init
 # or
 lwoodz-cli init
 
@@ -49,28 +49,28 @@ lwoodz-cli init
 #    [project] copyright_year = 2026
 
 # 3. Generate legal docs
-lwoodz --generate
-lwoodz-cli generate
+lwoodz remedy
+lwoodz-cli remedy
 
 # 4. Audit
-lwoodz --audit
-lwoodz --check          # compatibility only
-lwoodz --audit --json
-lwoodz-cli --json audit # note: --json is global, goes before the subcommand
+lwoodz audit
+lwoodz check              # compatibility only
+lwoodz --json audit
+lwoodz-cli --json audit   # note: --json is global, goes before the subcommand
 
 # 5. Headers
 lwoodz-cli headers              # insert/update headers (enforce mode also does this)
 lwoodz-cli headers --dry-run
 
 # 6. Daemon (watch mode)
-lwoodz --daemon
+lwoodz daemon
 # Check status (also reports whether the daemon is running and its last check)
 lwoodz-cli status
 ```
 
 ## Daemon lifecycle
 
-`lwoodz --daemon` runs in the foreground (systemd manages backgrounding —
+`lwoodz daemon` runs in the foreground (systemd manages backgrounding —
 there's no double-fork). It:
 
 - Writes a PID file to `.lwoodz/daemon.pid` and refuses to start a second
@@ -98,7 +98,7 @@ journalctl -u 'lwoodz@*' -f
 
 ## Configuration (`lwoodz.toml`)
 
-Generate with `lwoodz --init`. Key sections:
+Generate with `lwoodz init`. Key sections:
 
 ```toml
 [project]
@@ -167,9 +167,9 @@ Environment overrides: `LWOODZ_CONFIG`, `LWOODZ_LICENSE`, `LWOODZ_HOLDER`, `GROQ
 
 Lwoodz ships two binaries with a deliberate split, not overlapping accidents:
 
-- **`lwoodz`** is the thing you point a process supervisor at — `lwoodz --daemon`
+- **`lwoodz`** is the thing you point a process supervisor at — `lwoodz daemon`
   runs in the foreground (see [Daemon lifecycle](#daemon-lifecycle)), and its
-  non-daemon flags (`--audit`, `--generate`, ...) exist so a single static
+  subcommands (`audit`, `remedy`, ...) exist so a single static
   binary works both as the long-running watcher and as the one-shot check a
   pre-commit hook or CI step calls.
 - **`lwoodz-cli`** is the thing a human or a script runs interactively —
@@ -186,11 +186,11 @@ a deliberate two-binary split, not two versions of the same idea.
 
 ```
 lwoodz              # audit (default)
-lwoodz --daemon     # watch manifests continuously
-lwoodz --generate   # generate LICENSE/NOTICE/COPYRIGHT/attribution/manifest
-lwoodz --audit      # full audit
-lwoodz --check      # compat check only
-lwoodz --init       # create lwoodz.toml
+lwoodz daemon       # watch manifests continuously
+lwoodz remedy       # generate LICENSE/NOTICE/COPYRIGHT/attribution/manifest
+lwoodz audit        # full audit
+lwoodz check        # compat check only
+lwoodz init         # create lwoodz.toml
 lwoodz --json       # JSON output (audit/check)
 ```
 
@@ -198,9 +198,9 @@ lwoodz --json       # JSON output (audit/check)
 
 ```
 lwoodz-cli init [--force]
-lwoodz-cli generate [--dry-run]
+lwoodz-cli remedy [--dry-run]
 lwoodz-cli audit
-lwoodz-cli check [--strict]
+lwoodz-cli check
 lwoodz-cli licenses
 lwoodz-cli compat <project-spdx> <dep-spdx>
 lwoodz-cli detect [path]
