@@ -414,7 +414,8 @@ pub fn find_config_path() -> Option<PathBuf> {
 }
 
 pub fn load() -> anyhow::Result<Config> {
-    load_from(find_config_path().as_deref())
+    let path = find_config_path();
+    load_from(path.as_deref())
 }
 
 pub fn load_from(path: Option<&Path>) -> anyhow::Result<Config> {

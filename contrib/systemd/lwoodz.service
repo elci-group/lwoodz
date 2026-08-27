@@ -1,0 +1,52 @@
+# Copyright (c) 2026 sal
+# SPDX-License-Identifier: MIT
+#
+# lwoodz daemon — watches a single repository's manifests and keeps its
+# legal state (LICENSE/NOTICE/COPYRIGHT/headers) continuously consistent.
+#
+# Install (per repository you want governed):
+#   sudo cp contrib/systemd/lwoodz.service /etc/systemd/system/lwoodz@.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now lwoodz@$(systemd-escape /path/to/your/repo)
+#
+# The instance name after '@' is the systemd-escaped absolute repo path;
+# %I expands back to it below. Logs: journalctl -u 'lwoodz@*' -f
+#
+# lwoodz stays in the foreground and handles SIGTERM itself (graceful
+# shutdown, up to [daemon].shutdown_grace_secs in lwoodz.toml) — no
+# double-forking, no separate ExecStop needed.
+
+[Unit]
+Description=Lwoodz licensing daemon (%I)
+Documentation=https://github.com/elci-group/lwoodz
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=%I
+ExecStart=/usr/local/bin/lwoodz --daemon --config %I/lwoodz.toml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lwoodz
+
+# Uncomment if you use Groq-assisted `explain`/`generate` advice:
+# EnvironmentFile=-/etc/lwoodz/%i.env   # provide GROQ_API_KEY here, not inline
+
+# Security hardening — lwoodz only needs to read/write inside the repo it
+# governs and its own state directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%I
+LimitNOFILE=4096
+MemoryMax=256M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

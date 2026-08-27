@@ -1,0 +1,15 @@
+/target
+/.lwoodz/
+/.kaptaind/
+.env
+*.log
+.DS_Store
+# generated tool artifacts, not source
+.toon
+amber_report.json
+
+# fuzz targets are a standalone workspace (fuzz/Cargo.toml); its build
+# output/corpus/crash artifacts are not source, but fuzz/Cargo.lock is.
+fuzz/target/
+fuzz/corpus/
+fuzz/artifacts/

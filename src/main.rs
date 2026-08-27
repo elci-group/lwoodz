@@ -2,231 +2,97 @@
 // SPDX-License-Identifier: MIT
 
 use clap::Parser;
-use lwoodz::cli::{LwoodzArgs as Cli, LwoodzCommand};
+use form3::Form;
+use lwoodz::cli::LwoodzArgs as Cli;
 use lwoodz::config::loader::OperationMode;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if let Err(e) = lwoodz::util::dotenv::load() {
-        tracing::warn!(?e, "dotenv load failed");
+        Form::auto()
+            .component("lwoodz")
+            .warning(format!("dotenv load failed: {e}"));
     }
-
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
 
     let cli = Cli::parse();
 
-    // Handle init subcommand without requiring existing config
-    if matches!(cli.command, Some(LwoodzCommand::Init)) {
+    if let Some(p) = cli.config.as_ref() {
+        unsafe {
+            std::env::set_var("LWOODZ_CONFIG", p);
+        }
+    }
+
+    // Handle --init without requiring existing config
+    if cli.init {
         return init_config();
     }
 
-    let mut config = if let Some(p) = cli.config.as_ref() {
-        lwoodz::config::load_from(Some(p))?
-    } else {
-        lwoodz::config::load()?
-    };
+    let mut config = lwoodz::config::load()?;
 
     if cli.force {
         config.daemon.startup_guard = false;
     }
 
-    // Handle subcommands
-    match cli.command {
-        Some(LwoodzCommand::Daemon) => {
-            let daemon = lwoodz::daemon::Daemon::new(config);
-            daemon.run().await?;
-        }
-        Some(LwoodzCommand::Remedy { dry_run }) => {
-            cmd_generate(&config, dry_run, cli.json).await?;
-        }
-        Some(LwoodzCommand::Check) => {
-            let manifest = lwoodz::manifest::scan(&config.repo_path);
-            let pairs: Vec<(String, String)> = manifest
-                .dependencies
-                .iter()
-                .filter_map(|d| d.license.as_ref().map(|l| (d.name.clone(), l.clone())))
-                .collect();
-            let rep = lwoodz::license::compatibility::build_report(
-                &lwoodz::license::spdx::normalize_spdx(&config.project.license),
-                &pairs,
-            );
-            if cli.json {
-                println!("{}", serde_json::to_string_pretty(&rep)?);
-            } else {
-                println!(
-                    "Project license: {} | deps: {} | incompatible: {} | warnings: {}",
-                    rep.project_license, rep.total_deps, rep.incompatible_count, rep.warning_count
-                );
-                for i in &rep.issues {
-                    let icon =
-                        if i.compatibility == lwoodz::license::compatibility::Compatibility::Incompatible {
-                            "x"
-                        } else {
-                            "!"
-                        };
-                    println!(
-                        "  {} {} ({}) - {}",
-                        icon, i.dependency, i.dep_license, i.reason
-                    );
-                }
-                if rep.is_clean() {
-                    println!("  No issues.");
-                }
-            }
-            if rep.has_blockers() {
-                std::process::exit(2);
-            }
-        }
-        Some(LwoodzCommand::Audit) | None => {
-            // Default to audit if no subcommand provided
-            let report = lwoodz::audit::run(&config)?;
-            if cli.json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            } else {
-                print_audit(&report);
-            }
-            if !report.passed && config.audit.fail_on_incompatible {
-                std::process::exit(1);
-            }
-        }
-        Some(LwoodzCommand::Init) => {
-            // Already handled above
-            unreachable!();
-        }
-    }
+    // If no flags, default to audit
+    let is_default = !cli.daemon && !cli.generate && !cli.audit && !cli.check;
 
-    Ok(())
-}
-
-async fn cmd_generate(
-    config: &lwoodz::config::Config,
-    dry_run: bool,
-    json: bool,
-) -> anyhow::Result<()> {
-    if dry_run {
-        let body = lwoodz::generate::preview_license_body(config)?;
-        let spdx = lwoodz::license::spdx::normalize_spdx(&config.project.license);
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "spdx": spdx,
-                    "holder": config.project.copyright_holder,
-                    "year": config.project.copyright_year,
-                    "preview": body.lines().take(20).collect::<Vec<_>>()
-                })
-            );
-        } else {
-            println!("Dry run -- would generate LICENSE ({})", spdx);
-            println!("--- LICENSE preview (first 20 lines) ---");
-            for line in body.lines().take(20) {
-                println!("{}", line);
-            }
-            println!("--- would write to: {} ---", config.generate.license_file);
-        }
+    if cli.daemon {
+        let daemon = lwoodz::daemon::Daemon::new(config);
+        daemon.run().await?;
         return Ok(());
     }
 
-    let res = lwoodz::generate::generate_license_file(config)?;
-    if json {
-        let mut summary = serde_json::json!({
-            "license": res.license_path.display().to_string(),
-            "spdx": res.spdx,
-            "notice": res.notice_path.map(|p| p.display().to_string()),
-            "copyright": res.copyright_path.map(|p| p.display().to_string()),
-            "attribution": res.attribution_path.map(|p| p.display().to_string()),
-            "manifest": res.manifest_path.map(|p| p.display().to_string()),
-            "written": res.written.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
-            "skipped": res.skipped.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
-        });
-
-        if config.headers.enabled && config.operation.mode == OperationMode::Enforce {
-            let hc = lwoodz::license::header::HeaderConfig {
-                holder: config.project.copyright_holder.clone(),
-                year: config.project.copyright_year,
-                spdx: lwoodz::license::spdx::normalize_spdx(&config.project.license),
-                insert_spdx: config.headers.insert_spdx,
-            };
-            let results = lwoodz::license::header::ensure_headers(
-                &config.repo_path,
-                &hc,
-                &config.headers.exclude,
-                &config.headers.include,
-            )?;
-            let inserted = results
-                .iter()
-                .filter(|r| r.action == lwoodz::license::header::HeaderAction::Inserted)
-                .count();
-            let updated = results
-                .iter()
-                .filter(|r| r.action == lwoodz::license::header::HeaderAction::Updated)
-                .count();
-            let scanned = results.len();
-            summary["headers"] = serde_json::json!({
-                "inserted": inserted,
-                "updated": updated,
-                "scanned": scanned,
-            });
-        }
-
-        println!("{}", serde_json::to_string_pretty(&summary)?);
-    } else {
-        let action_label = if res.written.contains(&res.license_path) {
-            "Generated"
-        } else {
-            "Skipped"
-        };
-        println!(
-            "{} {} ({})",
-            action_label,
-            res.license_path.display(),
-            res.spdx
-        );
-        if let Some(p) = res.notice_path {
-            println!(
-                "  NOTICE -> {} ({})",
-                p.display(),
-                if res.written.contains(&p) {
-                    "written"
-                } else {
-                    "skipped"
+    if cli.generate {
+        if cli.dry_run {
+            let spdx = lwoodz::license::spdx::normalize_spdx(&config.project.license);
+            let body = lwoodz::generate::preview_license_body(&config)?;
+            if cli.json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "spdx": spdx,
+                        "holder": config.project.copyright_holder,
+                        "year": config.project.copyright_year,
+                        "preview": body.lines().take(20).collect::<Vec<_>>()
+                    })
+                );
+            } else {
+                println!("Dry run -- would generate LICENSE ({spdx})");
+                for line in body.lines().take(20) {
+                    println!("{line}");
                 }
+            }
+            return Ok(());
+        }
+        let res = lwoodz::generate::generate_license_file(&config)?;
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "license": res.license_path.display().to_string(),
+                    "spdx": res.spdx,
+                    "notice": res.notice_path.map(|path| path.display().to_string()),
+                    "copyright": res.copyright_path.map(|path| path.display().to_string()),
+                    "attribution": res.attribution_path.map(|path| path.display().to_string()),
+                    "manifest": res.manifest_path.map(|path| path.display().to_string()),
+                    "written": res.written.iter().map(|path| path.display().to_string()).collect::<Vec<_>>(),
+                    "skipped": res.skipped.iter().map(|path| path.display().to_string()).collect::<Vec<_>>(),
+                }))?
             );
+            return Ok(());
+        }
+        println!("✓ Generated {} ({})", res.license_path.display(), res.spdx);
+        if let Some(p) = res.notice_path {
+            println!("  NOTICE -> {}", p.display());
         }
         if let Some(p) = res.copyright_path {
-            println!(
-                "  COPYRIGHT -> {} ({})",
-                p.display(),
-                if res.written.contains(&p) {
-                    "written"
-                } else {
-                    "skipped"
-                }
-            );
+            println!("  COPYRIGHT -> {}", p.display());
         }
         if let Some(p) = res.attribution_path {
-            println!(
-                "  Attribution -> {} ({})",
-                p.display(),
-                if res.written.contains(&p) {
-                    "written"
-                } else {
-                    "skipped"
-                }
-            );
+            println!("  Attribution -> {}", p.display());
         }
         if let Some(p) = res.manifest_path {
-            println!(
-                "  SPDX manifest -> {} ({})",
-                p.display(),
-                if res.written.contains(&p) {
-                    "written"
-                } else {
-                    "skipped"
-                }
-            );
+            println!("  SPDX manifest -> {}", p.display());
         }
 
         if config.headers.enabled && config.operation.mode == OperationMode::Enforce {
@@ -257,7 +123,25 @@ async fn cmd_generate(
                 results.len()
             );
         }
+        return Ok(());
     }
+
+    if cli.check || cli.audit || is_default {
+        let report = lwoodz::audit::run(&config)?;
+        if cli.json {
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        } else {
+            print_audit(&report);
+        }
+        if !report.passed && config.audit.fail_on_incompatible {
+            std::process::exit(1);
+        }
+        if cli.check && report.compatibility.incompatible > 0 {
+            std::process::exit(2);
+        }
+        return Ok(());
+    }
+
     Ok(())
 }
 
@@ -287,10 +171,8 @@ fn print_audit(report: &lwoodz::audit::AuditReport) {
         }
     );
     println!(
-        "  Dependencies: {} total ({} third-party, {} first-party), {} incompatible, {} warnings",
+        "  Dependencies: {} total, {} incompatible, {} warnings",
         report.compatibility.total_deps,
-        report.compatibility.third_party,
-        report.compatibility.first_party,
         report.compatibility.incompatible,
         report.compatibility.warnings
     );
@@ -342,7 +224,6 @@ copyright_holder = "{holder}"
 copyright_year = {year}
 project_name = "{project_name}"
 # copyright_holder_email = "you@example.com"
-# project_url = "https://github.com/elci-group/{project_name}"
 # dual_license = "Apache-2.0"          # second license for dual-licensing
 # commercial_license = "SEE LICENSE IN Commercial-LICENSE"
 
@@ -360,7 +241,6 @@ license_file = "LICENSE"
 notice_file = "NOTICE"
 copyright_file = "COPYRIGHT"
 attribution_file = "THIRD_PARTY_NOTICES"
-# When false, existing files are left untouched. When true, files are overwritten.
 overwrite = true
 
 [headers]
@@ -397,6 +277,6 @@ fail_on_incompatible = false
     );
     std::fs::write(&dest, content)?;
     println!("✓ Created lwoodz.toml at {}", dest.display());
-    println!("  Edit [project] license/holder, then run `lwoodz remedy` or `lwoodz audit`.");
+    println!("  Edit [project] license/holder, then run `lwoodz --generate` or `lwoodz --audit`.");
     Ok(())
 }

@@ -33,8 +33,6 @@ pub struct AuditReport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompatibilitySummary {
     pub total_deps: usize,
-    pub first_party: usize,
-    pub third_party: usize,
     pub incompatible: usize,
     pub warnings: usize,
     pub issues: Vec<IssueView>,
@@ -127,18 +125,8 @@ pub fn run(cfg: &Config) -> anyhow::Result<AuditReport> {
 
     // 4. Dependency compatibility
     let manifest = crate::manifest::scan(&cfg.repo_path);
-    let first_party = manifest
+    let license_pairs: Vec<(String, String)> = manifest
         .dependencies
-        .iter()
-        .filter(|d| d.source == "cargo-local")
-        .count();
-    let third_party_deps: Vec<&crate::manifest::Dependency> = manifest
-        .dependencies
-        .iter()
-        .filter(|d| d.source != "cargo-local")
-        .collect();
-
-    let license_pairs: Vec<(String, String)> = third_party_deps
         .iter()
         .filter_map(|d| {
             d.license
@@ -148,7 +136,8 @@ pub fn run(cfg: &Config) -> anyhow::Result<AuditReport> {
         .collect();
 
     // For deps without license, flag as warning
-    let unknown_licenses: Vec<String> = third_party_deps
+    let unknown_licenses: Vec<String> = manifest
+        .dependencies
         .iter()
         .filter(|d| d.license.is_none())
         .map(|d| d.name.clone())
@@ -285,8 +274,6 @@ pub fn run(cfg: &Config) -> anyhow::Result<AuditReport> {
         header_coverage,
         compatibility: CompatibilitySummary {
             total_deps: manifest.dependencies.len(),
-            first_party,
-            third_party: third_party_deps.len(),
             incompatible: compat_report.incompatible_count,
             warnings: compat_report.warning_count,
             issues: issues_view,

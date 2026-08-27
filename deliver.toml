@@ -1,0 +1,59 @@
+# Copyright (c) 2026 sal
+# SPDX-License-Identifier: MIT
+[[file]]
+path = "Cargo.toml"
+required = true
+forbid_regex = ["TODO", "FIXME"]
+
+[[file]]
+path = "src/lib.rs"
+required = true
+forbid_regex = ["TODO", "FIXME", "todo!"]
+
+[[file]]
+path = "src/main.rs"
+required = true
+forbid_regex = ["TODO", "FIXME"]
+
+[[file]]
+path = "src/config/loader.rs"
+required = true
+
+[[file]]
+path = "src/license/templates.rs"
+required = true
+
+[[file]]
+path = "src/inference/groq.rs"
+required = true
+require_regex = ["GROQ_API_KEY"]
+
+[[file]]
+path = "README.md"
+required = true
+require_regex = ["Lwoodz is to"]
+
+[[file]]
+path = "lwoodz.toml.example"
+required = true
+
+[[file]]
+path = ".speck/manifest.toml"
+required = true
+
+[[file]]
+path = ".skillastic/config.json"
+required = true
+
+[[command]]
+name = "cargo check"
+cmd = ["cargo", "check"]
+expect_exit = 0
+timeout_secs = 120
+
+[[command]]
+name = "cargo test"
+cmd = ["cargo", "test"]
+expect_exit = 0
+timeout_secs = 120
+stdout_contains = ["test result: ok"]

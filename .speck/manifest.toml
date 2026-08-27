@@ -1,0 +1,50 @@
+# Copyright (c) 2026 sal
+# SPDX-License-Identifier: MIT
+project = "lwoodz"
+
+[tools.lwoodz]
+enabled = true
+config = "lwoodz.toml"
+description = "Licensing daemon — governs legal state (LICENSE, NOTICE, SPDX, headers)"
+commands = ["daemon", "generate", "audit", "check", "init"]
+
+[tools.lwoodz-cli]
+enabled = true
+description = "CLI companion for lwoodz daemon"
+commands = ["init", "generate", "audit", "check", "licenses", "compat", "detect", "explain", "headers", "dual", "status"]
+
+[tools.cargo]
+enabled = true
+description = "Rust package manager"
+commands = ["build", "test", "check", "clippy"]
+
+[tools.speck]
+enabled = true
+description = "Project capability registry"
+
+[tools.skillastic]
+enabled = true
+config = ".skillastic/config.json"
+description = "Adaptive skill runtime for version-aware skill maintenance"
+
+[tools.fract]
+enabled = true
+description = "Architectural health (entropy, cohesion, duplication)"
+
+[tools.amber]
+enabled = true
+description = "Dependency replaceability analysis"
+config = ".amber.toml"
+
+[tools.bart]
+enabled = true
+description = "Filesystem profiler / bloat analysis"
+
+[tools.deliver]
+enabled = true
+config = "deliver.toml"
+description = "Deterministic deliverable validator"
+
+[tools.verify-chain]
+enabled = true
+description = "Output claim auditor"

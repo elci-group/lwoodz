@@ -1,0 +1,18 @@
+# cargo-deny policy for Lwoodz. Run locally with: cargo deny check
+#
+# Policy: fail CI on known vulnerabilities and yanked crates; surface (warn on)
+# unsound / unmaintained advisories so they stay visible instead of being
+# silently swallowed. This is the policy counterpart to `cargo audit` — and,
+# for a licensing tool, the minimum bar for eating its own dog food.
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# cargo-deny 0.19+ defaults implement the policy above (vulnerability/yanked
+# are errors; unmaintained/unsound/notice are warnings).
+ignore = []
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -1,7 +1,9 @@
 // Copyright (c) 2026 sal
 // SPDX-License-Identifier: MIT
+#![allow(unused_assignments, unused_variables)] // Legacy tracing fields are stringified.
 use crate::config::loader::InferenceConfig;
 use crate::inference::InferenceContext;
+use crate::telemetry as tracing;
 use serde::{Deserialize, Serialize};
 
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";

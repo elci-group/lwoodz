@@ -121,7 +121,6 @@ pub fn check_compatibility(project_license: &str, dep_license: &str) -> Compatib
         "CC0-1.0",
         "Unlicense",
         "0BSD",
-        "Unicode-3.0",
     ];
     if permissive.contains(&dep.as_str()) {
         return Compatibility::Compatible;
@@ -292,26 +291,6 @@ pub fn policy_allows(policy: &str, dep_license: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn slash_joined_dual_license_into_mit_is_compatible() {
-        assert_eq!(
-            check_compatibility("MIT", "MIT/Apache-2.0"),
-            Compatibility::Compatible
-        );
-        assert_eq!(
-            check_compatibility("MIT", "Unlicense/MIT"),
-            Compatibility::Compatible
-        );
-    }
-
-    #[test]
-    fn unicode_license_into_mit_is_compatible() {
-        assert_eq!(
-            check_compatibility("MIT", "Unicode-3.0"),
-            Compatibility::Compatible
-        );
-    }
 
     #[test]
     fn gpl_into_mit_is_incompatible() {

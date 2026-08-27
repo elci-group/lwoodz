@@ -64,41 +64,19 @@ fn cargo_metadata_deps(repo_root: &Path, offline: bool) -> Option<Vec<Dependency
             .get("version")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let license = resolve_package_license(pkg);
-        // A path dependency outside the workspace is first-party code from
-        // the audit's point of view, even though Cargo includes it in the
-        // resolved package graph. Keep that distinction in the existing
-        // source field so callers do not classify it as third-party.
-        let source = if pkg.get("source").and_then(|v| v.as_str()).is_none() {
-            "cargo-local"
-        } else {
-            "cargo"
-        };
+        let license = pkg
+            .get("license")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         deps.push(Dependency {
             name,
             version,
             license,
-            source: source.to_string(),
+            source: "cargo".to_string(),
         });
     }
     Some(deps)
-}
-
-/// Resolve a package's declared license without guessing from its repository.
-/// Cargo normally supplies `license`; `license_file` is the package metadata
-/// fallback for crates that publish their SPDX declaration in a file.
-fn resolve_package_license(pkg: &serde_json::Value) -> Option<String> {
-    pkg.get("license")
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| s.to_string())
-        .or_else(|| {
-            let license_file = pkg.get("license_file").and_then(|v| v.as_str())?;
-            let manifest_path = pkg.get("manifest_path").and_then(|v| v.as_str())?;
-            let path = Path::new(manifest_path).parent()?.join(license_file);
-            let text = std::fs::read_to_string(path).ok()?;
-            crate::license::spdx::detect_spdx_from_text(&text)
-        })
 }
 
 /// Last-resort fallback when `cargo metadata` can't run at all: parse
@@ -223,28 +201,5 @@ mod tests {
         assert_eq!(deps.len(), 1);
         assert_eq!(deps[0].name, "foo");
         assert!(deps[0].license.is_none());
-    }
-
-    #[test]
-    fn package_license_file_is_used_when_license_is_absent() {
-        let dir = tempfile::tempdir().unwrap();
-        let manifest = dir.path().join("Cargo.toml");
-        std::fs::write(
-            &manifest,
-            "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nlicense-file = \"LICENSE\"\n",
-        )
-        .unwrap();
-        std::fs::write(
-            dir.path().join("LICENSE"),
-            "MIT License\nPermission is hereby granted, free of charge, to any person obtaining a copy.\n",
-        )
-        .unwrap();
-
-        let package = serde_json::json!({
-            "license": null,
-            "license_file": "LICENSE",
-            "manifest_path": manifest,
-        });
-        assert_eq!(resolve_package_license(&package).as_deref(), Some("MIT"));
     }
 }

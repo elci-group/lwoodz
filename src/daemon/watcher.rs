@@ -1,7 +1,9 @@
 // Copyright (c) 2026 sal
 // SPDX-License-Identifier: MIT
+#![allow(unused_variables)] // Legacy tracing field bindings are stringified by telemetry.
 use crate::config::Config;
 use crate::daemon::status::DaemonStatus;
+use crate::telemetry as tracing;
 use notify::Watcher;
 use std::sync::Arc;
 use std::time::Duration;

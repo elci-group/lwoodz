@@ -1,0 +1,12 @@
+# Common
+.git
+.kaptaind
+.DS_Store
+*.swp
+*.swo
+
+# Rust
+target
+fuzz/target
+fuzz/corpus
+fuzz/artifacts

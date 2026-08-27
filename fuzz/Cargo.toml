@@ -1,0 +1,39 @@
+# Copyright (c) 2026 sal
+# SPDX-License-Identifier: MIT
+[package]
+name = "lwoodz-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Standalone workspace so this crate is never pulled into the root package's
+# build/clippy/test runs (it needs nightly + cargo-fuzz to actually link).
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+lwoodz = { path = ".." }
+
+[[bin]]
+name = "fuzz_spdx_detect"
+path = "fuzz_targets/fuzz_spdx_detect.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_header_apply"
+path = "fuzz_targets/fuzz_header_apply.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_go_mod_parse"
+path = "fuzz_targets/fuzz_go_mod_parse.rs"
+test = false
+doc = false
+bench = false

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 sal
 // SPDX-License-Identifier: MIT
+#![allow(unused_variables)] // Legacy tracing field bindings are stringified by telemetry.
+use crate::telemetry as tracing;
 use std::path::{Path, PathBuf};
 
 /// Default location for the daemon's PID file, relative to the repo root —

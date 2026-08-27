@@ -30,34 +30,52 @@ Lwoodz governs a repository's legal state the way Kaptaind governs its temporal 
 
 Features:
   • Detects dependencies and checks license compatibility
-  • Remedies LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES
+  • Generates LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES
   • Inserts/updates copyright + SPDX headers in source files
   • Produces SPDX manifests and machine-readable licensing metadata
   • Audits repositories before release
   • Maintains contributor assignments & DCO
   • Dual-license / commercial-license variants
   • Inference via GROQ_API_KEY for advice and generation
-  • Uses `ami` project analysis (when installed) as a context clue for remedy
 
 USAGE:
   lwoodz                  Run audit (default)
-  lwoodz daemon           Run as licensing daemon (watch mode)
-  lwoodz remedy           Conduct contextualised fixes to legal documents
-  lwoodz audit             Full audit with output
-  lwoodz check             Compatibility check only
-  lwoodz init              Initialize lwoodz.toml in the current repository
+  lwoodz --daemon         Run as licensing daemon (watch mode)
+  lwoodz --generate       Generate licensing files
+  lwoodz --audit          Full audit with output
+  lwoodz --check          Compatibility check only
 
 ENVIRONMENT:
   GROQ_API_KEY            Groq API key for AI-assisted licensing advice
   LWOODZ_CONFIG           Path to lwoodz.toml (default: ./lwoodz.toml)
-  RUST_LOG                Log level (debug, info, warn, error)
 
 CONFIG FILE:
   Default: ./lwoodz.toml
-  Generate with: lwoodz init  (or lwoodz-cli init)
+  Generate with: lwoodz-cli init  (or lwoodz --init)
 "#
 )]
 pub struct LwoodzArgs {
+    /// Run as background licensing daemon (watches manifests for changes)
+    #[arg(long)]
+    pub daemon: bool,
+
+    /// Generate LICENSE and related legal documents
+    #[arg(long)]
+    pub generate: bool,
+
+    /// Run full audit (license file, SPDX, deps, headers)
+    #[arg(long)]
+    pub audit: bool,
+
+    /// Check dependency license compatibility only
+    #[arg(long)]
+    pub check: bool,
+
+    /// Initialize lwoodz.toml in the current repository
+    #[arg(long)]
+    pub init: bool,
+
+    /// Path to lwoodz.toml
     #[arg(short, long, value_name = "PATH")]
     pub config: Option<std::path::PathBuf>,
 
@@ -69,33 +87,9 @@ pub struct LwoodzArgs {
     #[arg(long)]
     pub json: bool,
 
-    #[command(subcommand)]
-    pub command: Option<LwoodzCommand>,
-}
-
-#[derive(Subcommand)]
-pub enum LwoodzCommand {
-    /// Run as background licensing daemon (watches manifests for changes)
-    Daemon,
-
-    /// Audit the repository and apply contextualised fixes to its legal
-    /// documents (LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES, SPDX
-    /// manifest, source headers). Uses `ami` project analysis, when
-    /// available, as a context clue for missing metadata.
-    Remedy {
-        /// Preview what remedy would write without modifying files
-        #[arg(long)]
-        dry_run: bool,
-    },
-
-    /// Run full audit (license file, SPDX, deps, headers)
-    Audit,
-
-    /// Check dependency license compatibility only
-    Check,
-
-    /// Initialize lwoodz.toml in the current repository
-    Init,
+    /// Preview generated licensing files without writing them
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Parser)]
@@ -121,18 +115,18 @@ pub enum LwoodzCliCommand {
         #[arg(long)]
         force: bool,
     },
-    /// Audit the repository and apply contextualised fixes to its legal
-    /// documents (LICENSE, NOTICE, COPYRIGHT, THIRD_PARTY_NOTICES, SPDX
-    /// manifest, source headers). Uses `ami` project analysis, when
-    /// available, as a context clue for missing metadata.
-    Remedy {
+    /// Generate LICENSE and related legal documents
+    Generate {
         #[arg(long)]
         dry_run: bool,
     },
     /// Run a full compliance audit
     Audit,
     /// Check dependency license compatibility only
-    Check,
+    Check {
+        #[arg(long)]
+        strict: bool,
+    },
     /// List known SPDX license identifiers
     Licenses,
     /// Check whether two SPDX identifiers are compatible

@@ -40,13 +40,12 @@ pub const KNOWN_SPDX: &[&str] = &[
     "Python-2.0",
     "Artistic-2.0",
     "OFL-1.1",
-    "Unicode-3.0",
 ];
 
 /// Normalize an SPDX expression: trim, canonicalize common aliases.
 pub fn normalize_spdx(input: &str) -> String {
     let s = input.trim();
-    let aliased = match s {
+    match s {
         "Apache 2.0" | "Apache2" | "Apache-2" => "Apache-2.0".to_string(),
         "GPL-2.0+" | "GPL2+" => "GPL-2.0-or-later".to_string(),
         "GPL-3.0+" | "GPL3+" => "GPL-3.0-or-later".to_string(),
@@ -54,21 +53,7 @@ pub fn normalize_spdx(input: &str) -> String {
         "BSD3" | "BSD-3" => "BSD-3-Clause".to_string(),
         "MPL2" | "MPL 2.0" => "MPL-2.0".to_string(),
         other => other.to_string(),
-    };
-    // Cargo metadata sometimes joins dual-licenses with "/" instead of the
-    // SPDX "OR" operator (e.g. "MIT/Apache-2.0", "Unlicense/MIT"). Rewrite
-    // to the canonical form so the compound-expression logic below applies.
-    if aliased.contains('/') && !aliased.contains(" OR ") && !aliased.contains(" AND ") {
-        let parts: Vec<&str> = aliased
-            .split('/')
-            .map(str::trim)
-            .filter(|part| !part.is_empty())
-            .collect();
-        if parts.len() > 1 {
-            return parts.join(" OR ");
-        }
     }
-    aliased
 }
 
 pub fn is_valid_spdx(id: &str) -> bool {
@@ -182,16 +167,6 @@ mod tests {
     fn normalize_aliases() {
         assert_eq!(normalize_spdx("Apache 2.0"), "Apache-2.0");
         assert_eq!(normalize_spdx("MIT"), "MIT");
-    }
-
-    #[test]
-    fn normalize_slash_joined_dual_license() {
-        assert_eq!(normalize_spdx("MIT/Apache-2.0"), "MIT OR Apache-2.0");
-        assert_eq!(normalize_spdx("Unlicense/MIT"), "Unlicense OR MIT");
-        assert_eq!(
-            normalize_spdx("Apache-2.0 / MIT"),
-            "Apache-2.0 OR MIT"
-        );
     }
 
     #[test]

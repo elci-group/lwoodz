@@ -1,0 +1,6 @@
+# Copyright (c) 2026 sal
+# SPDX-License-Identifier: MIT
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
