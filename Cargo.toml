@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [package]
 name = "lwoodz"
-version = "0.3.10"
+version = "0.3.11"
 edition = "2021"
 description = "Lwoodz is to license document generation and maintenance what Kaptaind is to version management — the canonical licensing daemon for a repository."
 license = "MIT"

@@ -36,6 +36,12 @@ and repository/component inconsistencies produce a deterministic
 `LICENSING_PROVENANCE_CONFLICT` observation. The contract records evidence and
 classification only—transformation strategy remains Amber's responsibility.
 
+Amber can consume these contracts to compare preservation, adaptation, forking,
+and independent implementation strategies. Keep the emitted evidence set with
+the assessment: downstream decisions must distinguish a declared repository
+licence from component-level provenance and escalate conflicts rather than
+treating the declaration as conclusive.
+
 ## Install
 
 ```bash
