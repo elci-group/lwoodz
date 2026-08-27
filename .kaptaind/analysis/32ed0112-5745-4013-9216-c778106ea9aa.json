@@ -1,0 +1,53 @@
+{
+  "cluster_id": "32ed0112-5745-4013-9216-c778106ea9aa",
+  "version": "0.1.19",
+  "bump": "Patch",
+  "event_count": 7,
+  "started_at": "2026-08-15T22:34:10.238226461Z",
+  "ended_at": "2026-08-15T22:34:10.381451033Z",
+  "diff": {
+    "structural": 0.19065583,
+    "api": 0.65625,
+    "deps": 0.0,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 2,
+    "api_touches": 2,
+    "api_signatures": 11,
+    "dependency_manifests": 0,
+    "dependency_nodes": 0,
+    "dependency_edges": 0,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/inference/mod.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/inference/mod.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      }
+    ],
+    "ast_cache_hits": 1,
+    "ast_cache_misses": 1,
+    "ast_cache_entries": 25
+  },
+  "weight": {
+    "score": 0.26360455,
+    "api_breaking": false,
+    "api_added": false
+  },
+  "air_gapped": false
+}

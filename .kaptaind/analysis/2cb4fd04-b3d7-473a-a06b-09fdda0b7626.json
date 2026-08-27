@@ -1,0 +1,71 @@
+{
+  "cluster_id": "2cb4fd04-b3d7-473a-a06b-09fdda0b7626",
+  "version": "0.1.7",
+  "bump": "Patch",
+  "event_count": 14,
+  "started_at": "2026-08-15T13:59:20.838447410Z",
+  "ended_at": "2026-08-15T13:59:22.068052525Z",
+  "diff": {
+    "structural": 0.38838416,
+    "api": 0.79375,
+    "deps": 0.0,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 4,
+    "api_touches": 4,
+    "api_signatures": 16,
+    "dependency_manifests": 0,
+    "dependency_nodes": 0,
+    "dependency_edges": 0,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/manifest/go.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/manifest/go.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/license/header.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/license/header.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      }
+    ],
+    "ast_cache_hits": 2,
+    "ast_cache_misses": 2,
+    "ast_cache_entries": 23
+  },
+  "weight": {
+    "score": 0.37405947,
+    "api_breaking": false,
+    "api_added": false
+  },
+  "air_gapped": false
+}

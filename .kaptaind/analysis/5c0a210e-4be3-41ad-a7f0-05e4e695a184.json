@@ -1,0 +1,53 @@
+{
+  "cluster_id": "5c0a210e-4be3-41ad-a7f0-05e4e695a184",
+  "version": "0.1.21",
+  "bump": "Patch",
+  "event_count": 2,
+  "started_at": "2026-08-16T12:24:33.786911433Z",
+  "ended_at": "2026-08-16T12:24:33.786923855Z",
+  "diff": {
+    "structural": 0.06354917,
+    "api": 0.2625,
+    "deps": 0.0,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 1,
+    "api_touches": 2,
+    "api_signatures": 1,
+    "dependency_manifests": 0,
+    "dependency_nodes": 0,
+    "dependency_edges": 0,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/daemon/watcher.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.95,
+        "version_match": "manifest"
+      },
+      {
+        "file": "src/daemon/watcher.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.95,
+        "version_match": "manifest"
+      }
+    ],
+    "ast_cache_hits": 1,
+    "ast_cache_misses": 1,
+    "ast_cache_entries": 25
+  },
+  "weight": {
+    "score": 0.10099221,
+    "api_breaking": false,
+    "api_added": false
+  },
+  "air_gapped": false
+}

@@ -1,0 +1,53 @@
+{
+  "cluster_id": "8641451b-96b3-4667-ac00-6bf7c0a5c104",
+  "version": "0.1.13",
+  "bump": "Patch",
+  "event_count": 2,
+  "started_at": "2026-08-15T21:48:45.474027850Z",
+  "ended_at": "2026-08-15T21:48:45.474038498Z",
+  "diff": {
+    "structural": 0.06354917,
+    "api": 0.2625,
+    "deps": 0.0,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 1,
+    "api_touches": 2,
+    "api_signatures": 1,
+    "dependency_manifests": 0,
+    "dependency_nodes": 0,
+    "dependency_edges": 0,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/manifest/python.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/manifest/python.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      }
+    ],
+    "ast_cache_hits": 1,
+    "ast_cache_misses": 1,
+    "ast_cache_entries": 23
+  },
+  "weight": {
+    "score": 0.10099221,
+    "api_breaking": false,
+    "api_added": false
+  },
+  "air_gapped": false
+}

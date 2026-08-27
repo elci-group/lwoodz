@@ -1,0 +1,53 @@
+{
+  "cluster_id": "e923785c-9a93-4332-b0f7-1af03bd34f92",
+  "version": "0.2.2",
+  "bump": "Patch",
+  "event_count": 7,
+  "started_at": "2026-08-16T13:00:50.806551252Z",
+  "ended_at": "2026-08-16T13:00:50.808922025Z",
+  "diff": {
+    "structural": 0.18959834,
+    "api": 0.65625,
+    "deps": 0.0,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 2,
+    "api_touches": 2,
+    "api_signatures": 16,
+    "dependency_manifests": 0,
+    "dependency_nodes": 0,
+    "dependency_edges": 0,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/license/header.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/license/header.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      }
+    ],
+    "ast_cache_hits": 1,
+    "ast_cache_misses": 1,
+    "ast_cache_entries": 27
+  },
+  "weight": {
+    "score": 0.26323444,
+    "api_breaking": false,
+    "api_added": false
+  },
+  "air_gapped": false
+}
