@@ -1,8 +1,8 @@
 {
-  "input_tokens": 429480,
+  "input_tokens": 429651,
   "output_tokens": 35,
-  "marginal_cost": 0.21479250000000003,
-  "aggregate_cost": 77515.6258194999,
+  "marginal_cost": 0.214878,
+  "aggregate_cost": 77515.8406974999,
   "stability": 0.0,
   "releases": 0,
   "failed_releases": 0,
@@ -11,18 +11,18 @@
   "ast_cache_entries": 36,
   "per_provider": {
     "none": {
-      "input_tokens": 155030860784,
-      "output_tokens": 130285,
-      "requests": 3706,
-      "marginal_cost": 77515.6258194999
+      "input_tokens": 155031290435,
+      "output_tokens": 130320,
+      "requests": 3707,
+      "marginal_cost": 77515.8406974999
     }
   },
   "per_model": {
     "none": {
-      "input_tokens": 155030860784,
-      "output_tokens": 130285,
-      "requests": 3706,
-      "marginal_cost": 77515.6258194999
+      "input_tokens": 155031290435,
+      "output_tokens": 130320,
+      "requests": 3707,
+      "marginal_cost": 77515.8406974999
     }
   }
 }
