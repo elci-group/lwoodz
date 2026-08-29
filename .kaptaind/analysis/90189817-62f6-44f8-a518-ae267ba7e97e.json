@@ -1,10 +1,10 @@
 {
-  "cluster_id": "d0a09f3c-2c5b-4264-b62f-c54a893ba346",
-  "version": "0.1.721",
+  "cluster_id": "90189817-62f6-44f8-a518-ae267ba7e97e",
+  "version": "0.1.1724",
   "bump": "Patch",
   "event_count": 13,
-  "started_at": "2026-08-28T11:05:06.199925873Z",
-  "ended_at": "2026-08-28T11:05:06.200416459Z",
+  "started_at": "2026-08-29T14:16:45.497029563Z",
+  "ended_at": "2026-08-29T14:16:45.497724050Z",
   "diff": {
     "structural": 0.33646584,
     "api": 0.0,
