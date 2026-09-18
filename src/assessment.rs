@@ -6,6 +6,7 @@
 //! about whether software should be retained, changed, or replaced.
 
 use crate::license::spdx::{normalize_spdx, SpdxExpression};
+use crate::openness::{self, OpenSourceStatus, StandardReference};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -82,6 +83,15 @@ pub struct LicenceFact {
     pub patent_provision: PatentProvision,
     pub evidence_ids: Vec<String>,
     pub confidence: f64,
+    /// Whether `expression` resolves to an OSI-approved license — a
+    /// separate axis from `family`'s copyleft strength. See
+    /// [`crate::openness`].
+    pub open_source_status: OpenSourceStatus,
+    /// Set when `subject`'s name matches a known open-standard
+    /// implementation (independent of `expression`'s license, and of
+    /// whether that standard is itself royalty-free). See
+    /// [`crate::openness`].
+    pub open_standard: Option<StandardReference>,
 }
 
 impl LicenceFact {
@@ -93,10 +103,13 @@ impl LicenceFact {
         origin: EvidenceOrigin,
         confidence: f64,
     ) -> Self {
+        let subject = subject.into();
         let expression = normalize_spdx(&expression.into());
         let spdx_identifiers = SpdxExpression::parse(expression.clone()).identifiers();
+        let open_source_status = openness::classify_license(&expression);
+        let open_standard = openness::standard_for(&subject);
         Self {
-            subject: subject.into(),
+            subject,
             expression,
             spdx_identifiers,
             family,
@@ -107,6 +120,8 @@ impl LicenceFact {
             patent_provision: PatentProvision::Unknown,
             evidence_ids: Vec::new(),
             confidence,
+            open_source_status,
+            open_standard,
         }
     }
 }
@@ -304,6 +319,38 @@ mod tests {
             assessment.conflicts[0].code,
             "LICENSING_PROVENANCE_CONFLICT"
         );
+    }
+
+    #[test]
+    fn licence_fact_carries_open_source_and_open_standard_evidence() {
+        let rustls = LicenceFact::normalized(
+            "rustls",
+            "Apache-2.0 OR MIT",
+            LicenceFamily::Permissive,
+            EvidenceOrigin::Observed,
+            0.9,
+        );
+        assert_eq!(rustls.open_source_status, OpenSourceStatus::OsiApproved);
+        assert_eq!(
+            rustls
+                .open_standard
+                .expect("rustls implements TLS")
+                .citation,
+            "RFC 8446"
+        );
+
+        let cc0 = LicenceFact::normalized(
+            "public-domain-data",
+            "CC0-1.0",
+            LicenceFamily::Permissive,
+            EvidenceOrigin::Declared,
+            1.0,
+        );
+        assert_eq!(
+            cc0.open_source_status,
+            OpenSourceStatus::PublicDomainEquivalent
+        );
+        assert!(cc0.open_standard.is_none());
     }
 
     #[test]

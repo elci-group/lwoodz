@@ -5,13 +5,11 @@ use std::io::Write;
 use std::process::Command;
 
 fn cargo_bin(name: &str) -> std::path::PathBuf {
-    let exe = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-    // Cargo sets CARGO_BIN_EXE_<name> for integration tests.
-    if let Ok(p) = std::env::var(format!("CARGO_BIN_EXE_{}", name)) {
-        return p.into();
+    match name {
+        "lwoodz" => env!("CARGO_BIN_EXE_lwoodz").into(),
+        "lwoodz-cli" => env!("CARGO_BIN_EXE_lwoodz-cli").into(),
+        _ => panic!("unknown test binary"),
     }
-    // Fallback for running outside Cargo's test harness.
-    std::path::PathBuf::from("target/debug").join(exe)
 }
 
 fn write_config(dir: &std::path::Path) {

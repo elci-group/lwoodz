@@ -1,34 +1,11 @@
-//! 3form-backed replacement for legacy tracing macros.
+//! Stderr-only replacement for legacy tracing macros.
 //!
 //! Diagnostic events are rendered to stderr so JSON and other machine-readable
 //! command output on stdout remains uncontaminated.
 
-use form3::{DevRenderer, Event, MachineRenderer, Mode, Renderer, Signal, UiRenderer};
-
 #[doc(hidden)]
 pub fn emit(level: &str, message: impl Into<String>) {
-    let message = message.into();
-    let event = match level {
-        "error" => Event::Error {
-            text: message,
-            cause: None,
-        },
-        "warn" => Event::Warning {
-            text: message,
-            cause: None,
-        },
-        "debug" => Event::Info {
-            text: format!("debug: {message}"),
-        },
-        _ => Event::Info { text: message },
-    };
-    let signal = Signal::new(event).component("lwoodz");
-    let rendered = match Mode::auto() {
-        Mode::Ui => UiRenderer.render(&signal),
-        Mode::Dev => DevRenderer.render(&signal),
-        Mode::Machine => MachineRenderer.render(&signal),
-    };
-    eprintln!("{rendered}");
+    eprintln!("lwoodz [{level}]: {}", message.into());
 }
 
 macro_rules! telemetry_info {

@@ -263,7 +263,11 @@ fn parse_ami_show_project(text: &str) -> Option<AmiContext> {
     }
 
     if let Some(idx) = text.find("Keywords") {
-        if let Some(kw_line) = text[idx..].lines().nth(2) {
+        if let Some(kw_line) = text[idx..]
+            .lines()
+            .skip(1)
+            .find(|line| !line.trim().is_empty())
+        {
             let kw_line = kw_line.trim();
             if !kw_line.is_empty() {
                 ctx.keywords = kw_line
