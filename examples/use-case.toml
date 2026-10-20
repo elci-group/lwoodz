@@ -1,0 +1,33 @@
+# All facts are declarations for this target, not findings from a source scan.
+[[targets]]
+target = "school-saas"
+use_case = "Hosted classroom assistant with teacher-reviewed feedback"
+markets = ["education", "enterprise"]
+activities = ["operate", "host"]
+user_jurisdictions = ["EU", "UK", "US-CA"]
+developer_jurisdictions = ["UK"]
+hosting_jurisdictions = ["EU"]
+personal_data = true
+sensitive_data = false
+children = true
+minimum_age = 13
+age_gate = "self_declared"
+automated_decisions = true
+user_content = true
+cross_border_transfers = true
+dependency_licenses = ["MIT", "AGPL-3.0-only"]
+
+[[targets]]
+target = "offline-sdk"
+use_case = "Local developer library distributed as source and binaries"
+markets = ["developer_tools"]
+activities = ["share_source", "distribute_binary"]
+user_jurisdictions = ["US", "JP"]
+developer_jurisdictions = ["UK"]
+personal_data = false
+sensitive_data = false
+children = false
+automated_decisions = false
+user_content = false
+cross_border_transfers = false
+dependency_licenses = ["MIT"]

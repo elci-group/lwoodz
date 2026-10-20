@@ -48,6 +48,7 @@ USAGE:
   lwoodz --check          Compatibility check only
   lwoodz --service-terms  Online-service/inference terms-of-use check
   lwoodz --openness       Open-source vs open-standard differentiation
+  lwoodz --jurisdictions  Per-jurisdiction index of required measures and certified methods
 
 ENVIRONMENT:
   GROQ_API_KEY            Groq API key for AI-assisted licensing advice
@@ -60,7 +61,7 @@ CONFIG FILE:
 )]
 pub struct LwoodzArgs {
     /// Analyze declared use cases from a TOML or JSON profile
-    #[arg(long, value_name = "PROFILE", conflicts_with_all = ["daemon", "generate", "audit", "check", "service_terms", "openness", "init"])]
+    #[arg(long, value_name = "PROFILE", conflicts_with_all = ["daemon", "generate", "audit", "check", "service_terms", "openness", "jurisdictions", "init"])]
     pub analyze: Option<std::path::PathBuf>,
 
     /// Run as background licensing daemon (watches manifests for changes)
@@ -86,6 +87,10 @@ pub struct LwoodzArgs {
     /// Differentiate dependencies by open-source license status vs open-standard implementation
     #[arg(long)]
     pub openness: bool,
+
+    /// Print the global per-jurisdiction index of required measures and certified methods of implementation
+    #[arg(long)]
+    pub jurisdictions: bool,
 
     /// Initialize lwoodz.toml in the current repository
     #[arg(long)]
@@ -152,6 +157,8 @@ pub enum LwoodzCliCommand {
     ServiceTerms,
     /// Differentiate dependencies by open-source license status vs open-standard implementation
     Openness,
+    /// Print the global per-jurisdiction index of required measures and certified methods of implementation
+    Jurisdictions,
     /// List known SPDX license identifiers
     Licenses,
     /// Check whether two SPDX identifiers are compatible

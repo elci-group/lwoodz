@@ -7,6 +7,7 @@ pub mod config;
 pub mod daemon;
 pub mod generate;
 pub mod inference;
+pub mod jurisdiction;
 pub mod license;
 pub mod manifest;
 pub mod openness;

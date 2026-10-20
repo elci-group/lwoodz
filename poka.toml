@@ -4,6 +4,8 @@ name = "lwoodz"
 [tools]
 traci = true
 
+lwoodz = true
+
 [rules]
 documentation = true
 security = true

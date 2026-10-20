@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 //! Offline, declared-context risk triage. Recommendations are separate from
 //! licensing evidence and never certify compliance or execute remedies.
+use crate::jurisdiction::{self, canonical, ConsentBand, MeasureFacts};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::path::Path;
 
 pub const SCHEMA: &str = "lwoodz.use-case-analysis/v1";
-pub const REVIEWED: &str = "2026-09-09";
+pub const REVIEWED: &str = "2026-10-03";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +31,17 @@ pub enum Market {
     DeveloperTools,
 }
 
+/// Age assurance mechanism at the service entry boundary, as declared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgeGateKind {
+    /// The user states their age or date of birth; nothing is verified.
+    SelfDeclared,
+    /// Independent age assurance: document/ID check, verified parental
+    /// consent, or a trusted third-party age signal.
+    Verified,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
@@ -50,6 +62,13 @@ pub struct Profile {
     pub sensitive_data: Option<bool>,
     #[serde(default)]
     pub children: Option<bool>,
+    /// Lowest age at which independent sign-up/use is permitted. Drives
+    /// consent-band detection; unknown when omitted.
+    #[serde(default)]
+    pub minimum_age: Option<u8>,
+    /// Age assurance declared at the entry boundary, if any.
+    #[serde(default)]
+    pub age_gate: Option<AgeGateKind>,
     #[serde(default)]
     pub automated_decisions: Option<bool>,
     #[serde(default)]
@@ -117,11 +136,66 @@ pub struct MarketAnalysis {
     pub recommended_entry: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgeBand {
+    pub jurisdiction: String,
+    /// Below this age a parent/guardian must authorize collection.
+    pub authorization_age: u8,
+    /// Below this age wider child-protection design rules scope in.
+    pub coverage_age: u8,
+    pub rule: String,
+    pub source_ids: Vec<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgeGateFinding {
+    pub code: String,
+    pub priority: String,
+    pub message: String,
+    pub remedy: String,
+    pub jurisdictions: Vec<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgeGateAssessment {
+    pub minimum_age: Option<u8>,
+    pub gate: Option<AgeGateKind>,
+    /// Consent bands maintained for the declared user jurisdictions.
+    pub bands: Vec<AgeBand>,
+    pub findings: Vec<AgeGateFinding>,
+    /// True while any P0 finding is open.
+    pub blocked: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicableMethod {
+    pub id: String,
+    pub name: String,
+    pub certifier: String,
+    pub instrument: String,
+    pub status: String,
+    pub reference_url: String,
+    pub reviewed_on: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicableMeasure {
+    pub id: String,
+    pub jurisdiction: String,
+    pub name: String,
+    pub obligation: String,
+    pub legal_basis: String,
+    pub source_id: String,
+    pub reviewed_on: String,
+    /// Declared facts that made the measure apply.
+    pub triggered_by: Vec<String>,
+    /// Certified methods of implementation maintained for this measure. An
+    /// empty list means none are on record, not that the measure is optional.
+    pub certified_methods: Vec<ApplicableMethod>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetAnalysis {
     pub profile: Profile,
     pub market_analysis: Vec<MarketAnalysis>,
     pub unknowns: Vec<String>,
     pub jurisdiction_reviews: Vec<JurisdictionReview>,
+    pub age_gate: AgeGateAssessment,
+    pub required_measures: Vec<ApplicableMeasure>,
     pub recommendations: Vec<Recommendation>,
     pub release_review_required: bool,
 }
@@ -136,13 +210,6 @@ pub struct Report {
 
 fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|s| (*s).into()).collect()
-}
-fn canonical(value: &str) -> String {
-    match value.trim().to_uppercase().as_str() {
-        "EEA" | "EU" => "EU".into(),
-        "GB" | "UK" => "UK".into(),
-        v => v.into(),
-    }
 }
 impl Profiles {
     pub fn validate(&self) -> anyhow::Result<()> {
@@ -205,11 +272,14 @@ pub fn analyze(profiles: &Profiles) -> anyhow::Result<Report> {
             "Declared-context triage, not legal advice, a legal determination, or a compliance certificate. No repository scan or control verification is performed.",
             "Priority reflects potential impact and urgency, not a measured probability or legal liability score. Remedies are proposed engineering actions, not statutory deadlines.",
             "Sources are a dated offline reference set. Recheck current law, commencement dates, local rules and contractual duties before release; unsupported jurisdictions require local review.",
+            "Age-gate and required-measure detection evaluate declared fields against the dated per-jurisdiction index (lwoodz.jurisdiction-index/v1); they do not verify a deployed gate, a signed instrument or the current legal text.",
             "No application changes, legal documents, external requests or executable compliance tools are produced. Directives specify tools to implement and verify for each target.",
         ]),
         sources: [
             ("gdpr", "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng"),
             ("uk-transfer", "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/international-transfers/a-guide-to-international-transfers/"),
+            ("uk-gdpr", "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/"),
+            ("uk-childrens-code", "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-code-guidance-and-resources/"),
             ("coppa", "https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa"),
             ("ccpa", "https://oag.ca.gov/privacy/ccpa"),
             ("hipaa", "https://www.hhs.gov/hipaa/for-professionals/covered-entities/index.html"),
@@ -259,6 +329,188 @@ fn recommendation(p: &Profile, r: Rule<'_>) -> Recommendation {
     }
 }
 
+/// Age gate detection: compare the declared `children` / `minimum_age` /
+/// `age_gate` facts against the consent bands maintained for the declared
+/// user jurisdictions. Omitted facts are unknown, never false, so detection
+/// reports scope gaps instead of silently passing them.
+fn detect_age_gate(p: &Profile, user_jurisdictions: &BTreeSet<String>) -> AgeGateAssessment {
+    let mut bands: Vec<AgeBand> = Vec::new();
+    for j in user_jurisdictions {
+        if let Some(b) = jurisdiction::band(j) {
+            bands.push(to_age_band(b));
+        }
+    }
+    let band_jurisdictions: Vec<String> = bands.iter().map(|b| b.jurisdiction.clone()).collect();
+    let below_any = |floor: u8| p.minimum_age.map(|m| m < floor).unwrap_or(false);
+    let severity = if p.children == Some(true) { "P0" } else { "P1" };
+    let mut findings = Vec::new();
+    let mut finding = |code: &str,
+                       priority: &str,
+                       message: String,
+                       remedy: String,
+                       jurisdictions: Vec<String>| {
+        findings.push(AgeGateFinding {
+            code: code.into(),
+            priority: priority.into(),
+            message,
+            remedy,
+            jurisdictions,
+        });
+    };
+    if p.children.is_none() && p.minimum_age.is_none() {
+        finding(
+            "AGE_SCOPE_UNKNOWN",
+            "P1",
+            "Neither children nor minimum_age is declared; age-related obligations cannot be scoped and consent-band checks are skipped."
+                .into(),
+            "Declare children and minimum_age (an explicit value counts) before relying on age-gate conclusions."
+                .into(),
+            band_jurisdictions.clone(),
+        );
+    }
+    if p.children == Some(true) && p.minimum_age.is_none() && p.age_gate.is_none() {
+        finding(
+            "AGE_GATE_MISSING",
+            "P1",
+            "Children are declared in the audience but neither an age gate nor a minimum_age floor is declared."
+                .into(),
+            "Declare the entry control (age_gate kind and minimum_age) and enforce it server-side before any collection."
+                .into(),
+            band_jurisdictions.clone(),
+        );
+    }
+    if p.age_gate.is_some() && p.minimum_age.is_none() {
+        finding(
+            "AGE_GATE_WITHOUT_FLOOR",
+            "P1",
+            "An age gate is declared without a minimum_age floor, so band adequacy cannot be checked."
+                .into(),
+            "Declare minimum_age and verify the gate blocks sign-up below each applicable jurisdiction band."
+                .into(),
+            band_jurisdictions.clone(),
+        );
+    }
+    for b in &bands {
+        if below_any(b.authorization_age) {
+            let coppa = b.jurisdiction == "US";
+            finding(
+                "BELOW_AUTHORIZATION_BAND",
+                severity,
+                format!(
+                    "minimum_age {} is below the {} parental-authorization age of {}{}.",
+                    p.minimum_age.unwrap_or_default(),
+                    b.jurisdiction,
+                    b.authorization_age,
+                    if coppa { " (COPPA verifiable consent)" } else { "" },
+                ),
+                format!(
+                    "Raise minimum_age to {}+ or implement {}authorization with verifiable parental consent and revocation propagation.",
+                    b.authorization_age,
+                    if coppa { "COPPA-compliant " } else { "" },
+                ),
+                vec![b.jurisdiction.clone()],
+            );
+        }
+        if b.coverage_age > b.authorization_age
+            && (p.children == Some(true) || below_any(b.coverage_age))
+        {
+            finding(
+                "CHILD_PROTECTION_CODE_SCOPE",
+                "P1",
+                format!(
+                    "Service is in scope of {} child-protection design rules covering under-{}s{}.",
+                    b.jurisdiction,
+                    b.coverage_age,
+                    if p.children == Some(true) {
+                        " (children declared in the audience)"
+                    } else {
+                        " via the declared minimum_age"
+                    },
+                ),
+                format!(
+                    "Apply the {} design standards: age-appropriate defaults, data minimization, profiling off by default, and guardian controls."
+                        ,
+                    b.jurisdiction
+                ),
+                vec![b.jurisdiction.clone()],
+            );
+        }
+    }
+    if p.age_gate == Some(AgeGateKind::SelfDeclared)
+        && (p.children == Some(true)
+            || p.sensitive_data == Some(true)
+            || bands.iter().any(|b| below_any(b.authorization_age)))
+    {
+        finding(
+            "SELF_DECLARED_GATE_INSUFFICIENT",
+            "P1",
+            "Age gate is self-declared only while verifiable authorization or sensitive-data duties may apply; attested age is unverified."
+                .into(),
+            "Use verified parental consent or an independent age-assurance signal where a band requires it; keep the self-declared path only as a first filter."
+                .into(),
+            band_jurisdictions.clone(),
+        );
+    }
+    let blocked = findings.iter().any(|f| f.priority == "P0");
+    AgeGateAssessment {
+        minimum_age: p.minimum_age,
+        gate: p.age_gate,
+        bands,
+        findings,
+        blocked,
+    }
+}
+
+fn to_age_band(b: &ConsentBand) -> AgeBand {
+    AgeBand {
+        jurisdiction: b.jurisdiction.clone(),
+        authorization_age: b.authorization_age,
+        coverage_age: b.coverage_age,
+        rule: b.rule.clone(),
+        source_ids: vec![b.source_id.clone()],
+    }
+}
+
+/// Requirement detection: evaluate the per-jurisdiction index of required
+/// measures against the declared facts, attaching the certified methods of
+/// implementation maintained for each measure that applies.
+fn detect_requirements(
+    jurisdictions: &BTreeSet<String>,
+    facts: &MeasureFacts,
+) -> Vec<ApplicableMeasure> {
+    let mut out = Vec::new();
+    for j in jurisdictions {
+        for m in jurisdiction::measures_for(j) {
+            if let Some(triggered_by) = m.applies(facts) {
+                out.push(ApplicableMeasure {
+                    id: m.id.clone(),
+                    jurisdiction: m.jurisdiction.clone(),
+                    name: m.name.clone(),
+                    obligation: m.obligation.clone(),
+                    legal_basis: m.legal_basis.clone(),
+                    source_id: m.source_id.clone(),
+                    reviewed_on: m.reviewed_on.clone(),
+                    triggered_by,
+                    certified_methods: jurisdiction::methods_implementing(&m.id)
+                        .into_iter()
+                        .map(|cm| ApplicableMethod {
+                            id: cm.id.clone(),
+                            name: cm.name.clone(),
+                            certifier: cm.certifier.clone(),
+                            instrument: cm.instrument.clone(),
+                            status: cm.status.label().to_string(),
+                            reference_url: cm.reference_url.clone(),
+                            reviewed_on: cm.reviewed_on.clone(),
+                        })
+                        .collect(),
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| a.jurisdiction.cmp(&b.jurisdiction).then(a.id.cmp(&b.id)));
+    out
+}
+
 fn analyze_target(p: &Profile) -> TargetAnalysis {
     let mut unknowns = Vec::new();
     for (name, value) in [
@@ -290,9 +542,25 @@ fn analyze_target(p: &Profile) -> TargetAnalysis {
             "Supply hosting_jurisdictions, including vendors, backups and support access.".into(),
         );
     }
+    if p.children == Some(true) {
+        if p.minimum_age.is_none() {
+            unknowns.push(
+                "Confirm minimum_age for the child audience; omitted values are unknown, not false."
+                    .into(),
+            );
+        }
+        if p.age_gate.is_none() {
+            unknowns.push(
+                "Confirm age_gate (self_declared or verified); omitted values are unknown, not false."
+                    .into(),
+            );
+        }
+    }
     if p.dependency_licenses.is_empty() {
         unknowns.push("Dependency licenses are unassessed; provide expressions and run the separate licensing audit.".into());
     }
+    let user_jurisdictions: BTreeSet<String> =
+        p.user_jurisdictions.iter().map(|s| canonical(s)).collect();
     let jurisdictions: BTreeSet<String> = p
         .user_jurisdictions
         .iter()
@@ -300,6 +568,26 @@ fn analyze_target(p: &Profile) -> TargetAnalysis {
         .chain(&p.hosting_jurisdictions)
         .map(|s| canonical(s))
         .collect();
+    let transfer_signal = p.cross_border_transfers == Some(true)
+        || (p.personal_data != Some(false)
+            && p.user_jurisdictions.iter().any(|u| {
+                p.hosting_jurisdictions
+                    .iter()
+                    .any(|h| canonical(u) != canonical(h))
+            }));
+    let facts = MeasureFacts {
+        children: p.children,
+        minimum_age: p.minimum_age,
+        personal_data: p.personal_data,
+        sensitive_data: p.sensitive_data,
+        automated_decisions: p.automated_decisions,
+        user_content: p.user_content,
+        transfers: transfer_signal,
+        operates_service: p.activities.contains(&Activity::Operate)
+            || p.activities.contains(&Activity::Host),
+    };
+    let age_gate = detect_age_gate(p, &user_jurisdictions);
+    let required_measures = detect_requirements(&jurisdictions, &facts);
     let has = |j: &str| jurisdictions.contains(j);
     let us = has("US") || has("US-CA");
     let mut reviews = Vec::new();
@@ -371,6 +659,15 @@ fn analyze_target(p: &Profile) -> TargetAnalysis {
         implement:"Build a territory/age-policy engine with minimized age signals, verifiable authorization where required, revocation propagation and accessible guardian notices. Avoid collecting identity documents by default.",
         tests:&["Missing or revoked required authorization blocks collection server-side.","Age boundaries follow the selected reviewed policy; UI bypass cannot enable restricted collection."] });
     }
+    if !age_gate.findings.is_empty() {
+        add(Rule {
+        id:"AGE_GATE",priority:if age_gate.blocked {"P0"} else {"P1"},trigger:"Age gate or consent-band finding detected",
+        user:"Under-age users may pass a weak gate and encounter collection or content their jurisdiction restricts.",developer:"Consent-band breaches create per-jurisdiction exposure that compounds with child-audience and data-governance duties.",
+        applicability:"Findings reference declared minimum_age, age_gate and user jurisdictions only; they do not measure a deployed control.",sources:&[],
+        immediate:"Read the age_gate section, close P0 findings before launch, and restrict the affected flow to a reviewed pilot meanwhile.",
+        implement:"Build the declared age gate as an enforced server-side check: minimum_age floor, verified authorization below each applicable band, guardian-consent revocation propagation and evidence logging.",
+        tests:&["A sign-up below minimum_age is rejected server-side, not only in the UI.","Band changes require policy review; bypass attempts produce audit evidence."] });
+    }
     if p.automated_decisions == Some(true) {
         add(Rule {
         id:"AUTOMATED_DECISIONS",priority:"P0",trigger:"Automated decisions declared",user:"Incorrect or discriminatory decisions may deny services, jobs or essential opportunities.",developer:"Deployment role, intended use and decision effects can trigger privacy, equality or AI-specific duties.",
@@ -379,14 +676,7 @@ fn analyze_target(p: &Profile) -> TargetAnalysis {
         implement:"Build a decision register recording model/policy versions, intended use, test evidence and human overrides. Add representative error/bias evaluations, drift thresholds and an appeal workflow with minimal sensitive logging.",
         tests:&["Consequential actions cannot bypass required human approval.","Model/policy changes invalidate sign-off; appeals and rollback work end-to-end."] });
     }
-    if p.cross_border_transfers == Some(true)
-        || (p.personal_data != Some(false)
-            && p.user_jurisdictions.iter().any(|u| {
-                p.hosting_jurisdictions
-                    .iter()
-                    .any(|h| canonical(u) != canonical(h))
-            }))
-    {
+    if transfer_signal {
         add(Rule {
         id:"TRANSFERS",priority:"P1",trigger:"Declared transfer or differing user/hosting territories suggest transfer review",user:"Foreign access may change privacy protections and available remedies.",developer:"Transfer restrictions may cover vendors and remote access as well as storage location.",applicability:"Different locations are a review signal, not proof of a restricted transfer. Determine exporter, importer, access, applicable law and legal route.",sources:if has("UK") { &["uk-transfer"] } else if has("EU") { &["gdpr"] } else { &[] },
         immediate:"Inventory foreign recipients and remote support; pause unreviewed personal-data routes while preserving required service and incident evidence.",
@@ -451,6 +741,8 @@ fn analyze_target(p: &Profile) -> TargetAnalysis {
         market_analysis,
         unknowns,
         jurisdiction_reviews: reviews,
+        age_gate,
+        required_measures,
         recommendations: recs,
         release_review_required: true,
     }
@@ -487,6 +779,75 @@ pub fn render(report: &Report) -> String {
                 j.variation,
                 j.source_ids.join(", ")
             ));
+        }
+        out.push_str(&format!(
+            "\nAge gate: minimum_age {}, gate {} — {}\n",
+            t.age_gate
+                .minimum_age
+                .map(|m| m.to_string())
+                .unwrap_or_else(|| "undeclared".into()),
+            t.age_gate
+                .gate
+                .map(|g| format!("{g:?}"))
+                .unwrap_or_else(|| "undeclared".into()),
+            if t.age_gate.blocked {
+                "BLOCKED (P0 finding open)"
+            } else if t.age_gate.findings.is_empty() {
+                "no findings"
+            } else {
+                "findings open"
+            }
+        ));
+        for b in &t.age_gate.bands {
+            out.push_str(&format!(
+                "Age band {}: parental authorization below {}; wider coverage below {}. {} Sources: {}\n",
+                b.jurisdiction,
+                b.authorization_age,
+                b.coverage_age,
+                b.rule,
+                b.source_ids.join(", ")
+            ));
+        }
+        for f in &t.age_gate.findings {
+            out.push_str(&format!(
+                "Age finding [{}] {}: {}\n  Remedy: {}\n",
+                f.priority, f.code, f.message, f.remedy
+            ));
+        }
+        if t.required_measures.is_empty() {
+            out.push_str("Required measures: none triggered by declared facts.\n");
+        } else {
+            out.push_str("Required measures:\n");
+            for m in &t.required_measures {
+                out.push_str(&format!(
+                    "  [{}] {} — {}\n    Obligation: {}\n    Legal basis: {}  Source: {} (reviewed {})\n    Triggered by: {}\n",
+                    m.jurisdiction,
+                    m.id,
+                    m.name,
+                    m.obligation,
+                    m.legal_basis,
+                    m.source_id,
+                    m.reviewed_on,
+                    m.triggered_by.join("; ")
+                ));
+                if m.certified_methods.is_empty() {
+                    out.push_str(
+                        "    Certified methods: none maintained; implement directly and record verification.\n",
+                    );
+                } else {
+                    for cm in &m.certified_methods {
+                        out.push_str(&format!(
+                            "    Certified method {} — {} ({}; {}; {})\n      {}\n",
+                            cm.id,
+                            cm.name,
+                            cm.certifier,
+                            cm.status,
+                            cm.instrument,
+                            cm.reference_url
+                        ));
+                    }
+                }
+            }
         }
         for r in &t.recommendations {
             out.push_str(&format!("\n[{}] {}\nTrigger: {}\nUser risk: {}\nDeveloper exposure: {}\nApplicability: {}\nSources: {}\n",r.priority,r.id,r.trigger,r.user_risk,r.developer_exposure,r.applicability,r.source_ids.join(", ")));
@@ -527,4 +888,152 @@ pub fn run(path: &Path, json: bool) -> anyhow::Result<()> {
         print!("{}", render(&report));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn profile() -> Profile {
+        toml::from_str(
+            r#"
+target = "t"
+use_case = "u"
+markets = ["consumer"]
+activities = ["operate", "host"]
+user_jurisdictions = ["EU", "UK", "US-CA"]
+personal_data = true
+children = true
+minimum_age = 13
+age_gate = "self_declared"
+dependency_licenses = ["MIT"]
+"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn age_gate_detection_reports_band_scope_and_gate_strength() {
+        let p = profile();
+        let users: BTreeSet<String> = p.user_jurisdictions.iter().map(|s| canonical(s)).collect();
+        let a = detect_age_gate(&p, &users);
+        assert!(a.blocked, "children=true makes band breaches P0");
+        let codes: Vec<&str> = a.findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(codes.contains(&"BELOW_AUTHORIZATION_BAND"));
+        assert!(codes.contains(&"CHILD_PROTECTION_CODE_SCOPE"));
+        assert!(codes.contains(&"SELF_DECLARED_GATE_INSUFFICIENT"));
+        assert!(!codes.contains(&"AGE_GATE_MISSING"));
+        assert_eq!(a.bands.len(), 3);
+        let uk = a.bands.iter().find(|b| b.jurisdiction == "UK").unwrap();
+        assert_eq!(uk.coverage_age, 18);
+        let eu = a
+            .findings
+            .iter()
+            .find(|f| f.code == "BELOW_AUTHORIZATION_BAND" && f.jurisdictions == ["EU"])
+            .unwrap();
+        assert_eq!(eu.priority, "P0");
+    }
+
+    #[test]
+    fn age_gate_detection_passes_clean_declarations() {
+        let mut p = profile();
+        p.children = Some(false);
+        p.minimum_age = Some(18);
+        p.age_gate = Some(AgeGateKind::Verified);
+        p.sensitive_data = Some(false);
+        let users: BTreeSet<String> = p.user_jurisdictions.iter().map(|s| canonical(s)).collect();
+        let a = detect_age_gate(&p, &users);
+        assert!(a.findings.is_empty(), "findings: {:?}", a.findings);
+        assert!(!a.blocked);
+    }
+
+    #[test]
+    fn age_gate_detection_flags_undeclared_scope_and_floorless_gates() {
+        let mut p = profile();
+        p.children = None;
+        p.minimum_age = None;
+        p.age_gate = None;
+        let users: BTreeSet<String> = p.user_jurisdictions.iter().map(|s| canonical(s)).collect();
+        let a = detect_age_gate(&p, &users);
+        let codes: Vec<&str> = a.findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(codes.contains(&"AGE_SCOPE_UNKNOWN"));
+        assert!(!codes.contains(&"BELOW_AUTHORIZATION_BAND"));
+
+        let mut p = profile();
+        p.minimum_age = None;
+        let a = detect_age_gate(&p, &users);
+        let codes: Vec<&str> = a.findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(codes.contains(&"AGE_GATE_WITHOUT_FLOOR"));
+        assert!(!codes.contains(&"AGE_GATE_MISSING"));
+
+        let mut p = profile();
+        p.minimum_age = None;
+        p.age_gate = None;
+        let a = detect_age_gate(&p, &users);
+        let codes: Vec<&str> = a.findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(codes.contains(&"AGE_GATE_MISSING"));
+        assert!(!codes.contains(&"AGE_GATE_WITHOUT_FLOOR"));
+    }
+
+    #[test]
+    fn requirement_detection_links_measures_to_certified_methods() {
+        let p = profile();
+        let jurisdictions: BTreeSet<String> = p
+            .user_jurisdictions
+            .iter()
+            .chain(&p.developer_jurisdictions)
+            .chain(&p.hosting_jurisdictions)
+            .map(|s| canonical(s))
+            .collect();
+        let facts = MeasureFacts {
+            children: p.children,
+            minimum_age: p.minimum_age,
+            personal_data: p.personal_data,
+            sensitive_data: p.sensitive_data,
+            automated_decisions: p.automated_decisions,
+            user_content: p.user_content,
+            transfers: true,
+            operates_service: true,
+        };
+        let measures = detect_requirements(&jurisdictions, &facts);
+        let ids: Vec<&str> = measures.iter().map(|m| m.id.as_str()).collect();
+        assert!(ids.contains(&"eu-transfer-safeguards"));
+        assert!(ids.contains(&"eu-child-authorization"));
+        assert!(ids.contains(&"uk-childrens-code"));
+        assert!(ids.contains(&"us-ca-minor-opt-in"));
+        assert!(
+            !ids.contains(&"us-coppa-parental-consent"),
+            "US not declared"
+        );
+        let transfer = measures
+            .iter()
+            .find(|m| m.id == "eu-transfer-safeguards")
+            .unwrap();
+        assert!(transfer
+            .certified_methods
+            .iter()
+            .any(|m| m.id == "eu-scc-2021-914"));
+        assert!(transfer
+            .certified_methods
+            .iter()
+            .any(|m| m.id == "eu-us-data-privacy-framework"));
+        let uk_child = measures
+            .iter()
+            .find(|m| m.id == "uk-child-authorization")
+            .unwrap();
+        assert!(uk_child.certified_methods.is_empty());
+        for m in &measures {
+            assert!(!m.triggered_by.is_empty());
+        }
+    }
+
+    #[test]
+    fn requirement_detection_finds_nothing_without_declared_facts() {
+        let jurisdictions: BTreeSet<String> = ["EU".to_string()].into_iter().collect();
+        let facts = MeasureFacts {
+            personal_data: Some(false),
+            ..Default::default()
+        };
+        assert!(detect_requirements(&jurisdictions, &facts).is_empty());
+    }
 }

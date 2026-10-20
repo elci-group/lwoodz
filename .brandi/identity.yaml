@@ -1,0 +1,10 @@
+product:
+  name: Lwoodz
+  tagline: "Order in the codebase."
+  mission: "Govern a repository's legal state — licenses, notices, copyright — the way a court governs a jurisdiction."
+  aliases: []
+  former_names: []
+archetype: ["judge", "scholar", "bailiff"]
+terminology:
+  canonical: {}
+  banned_variants: {}

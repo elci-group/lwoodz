@@ -21,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Check { strict } => cmd_check(cli.json, strict),
         Commands::ServiceTerms => cmd_service_terms(cli.json),
         Commands::Openness => cmd_openness(cli.json),
+        Commands::Jurisdictions => lwoodz::jurisdiction::run(cli.json),
         Commands::Licenses => cmd_licenses(cli.json),
         Commands::Compat { project, dep } => cmd_compat(project, dep, cli.json),
         Commands::Detect { path } => cmd_detect(path, cli.json),

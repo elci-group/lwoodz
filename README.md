@@ -27,6 +27,7 @@ The canonical licensing daemon for a repository — governs legal state the way 
 - **Inference** — optional AI-assisted advice via `GROQ_API_KEY` (Groq OpenAI-compatible API, `llama-3.3-70b-versatile` default).
 - **Service terms** — `lwoodz --service-terms` / `lwoodz-cli service-terms` flags dependencies that are clients for a known online service or inference provider (Groq, OpenAI, Anthropic, AWS Bedrock, Google Gemini/Vertex AI, Cohere, Hugging Face Inference, Replicate, Together AI, Stripe, Twilio) and reports what's known about that provider's terms of use — training use of submitted data, output redistribution, commercial use, retention. A crate's own SPDX license covers its source, not the separate contract governing the hosted API it talks to; `lwoodz audit` also surfaces a non-blocking `SERVICE_TERMS_REVIEW` pointer when any are detected. See [`src/service_terms.rs`](src/service_terms.rs) for the catalog and its `limitations` disclaimers — this is declared-context triage against a maintained, dated reference list, not a scan of actual contracts.
 - **Open source vs open standard** — `lwoodz --openness` / `lwoodz-cli openness` differentiate two independent axes per dependency: whether its declared *license* is on the OSI's approved list, and whether it *implements a specification governed by a standards body* (IETF, W3C, WHATWG, ISO/IEC, the Unicode Consortium, an open industry consortium). A governed standard is not automatically royalty-free — AV1 and H.264 are both "open standards" under materially different patent-licensing regimes — so `lwoodz audit` raises a `STANDARD_PATENT_RISK` warning when a dependency implements a RAND/FRAND-encumbered one. The same evidence (`open_source_status`, `open_standard`) is attached to every `LicenceFact` in the licensing/provenance assessment contract (see below) for downstream licensing-strategy decisions. See [`src/openness.rs`](src/openness.rs).
+- **Jurisdiction indices, requirement & age gate detection** — `lwoodz --analyze` / `lwoodz-cli analyze --profile` evaluate a declared use-case profile against a global per-jurisdiction index of required measures and certified methods of implementation (`src/jurisdiction.rs`): EU/UK/US/US-CA transfer safeguards, child authorization, child-protection design codes, consumer rights and minor opt-in, each with the certified instruments that implement it (EU SCCs 2021/914, UK IDTA/Addendum, EU-US Data Privacy Framework, FTC-approved COPPA safe harbor, the recognized Global Privacy Control signal). The profile's `children` / `minimum_age` / `age_gate` declarations drive consent-band detection (EU 13–16, UK 13 + Children's Code, COPPA under-13, CCPA under-16), producing structured age-gate findings and a blocked flag. `lwoodz --jurisdictions` / `lwoodz-cli jurisdictions` dump the full index on its own. See [`docs/use-case-analysis.md`](docs/use-case-analysis.md).
 
 ## Licensing and provenance assessment contract
 
@@ -217,6 +218,7 @@ lwoodz --audit      # full audit
 lwoodz --check      # compat check only
 lwoodz --service-terms  # online-service/inference terms-of-use check
 lwoodz --openness   # open-source vs open-standard differentiation
+lwoodz --jurisdictions  # per-jurisdiction index of required measures + certified methods
 lwoodz --init       # create lwoodz.toml
 lwoodz --json       # JSON output (audit/check)
 ```
@@ -230,6 +232,7 @@ lwoodz-cli audit
 lwoodz-cli check [--strict]
 lwoodz-cli service-terms
 lwoodz-cli openness
+lwoodz-cli jurisdictions
 lwoodz-cli licenses
 lwoodz-cli compat <project-spdx> <dep-spdx>
 lwoodz-cli detect [path]

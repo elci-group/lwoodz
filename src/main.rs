@@ -16,6 +16,10 @@ async fn main() -> anyhow::Result<()> {
         return lwoodz::use_case::run(profile, cli.json);
     }
 
+    if cli.jurisdictions {
+        return lwoodz::jurisdiction::run(cli.json);
+    }
+
     if let Some(p) = cli.config.as_ref() {
         unsafe {
             std::env::set_var("LWOODZ_CONFIG", p);

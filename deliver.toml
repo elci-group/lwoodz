@@ -1,0 +1,16 @@
+[[file]]
+path = "src/use_case.rs"
+forbid_regex = ["TODO", "unimplemented!"]
+[[file]]
+path = "docs/use-case-analysis.md"
+[[file]]
+path = "examples/use-case.toml"
+[[command]]
+name = "all targets"
+cmd = ["cargo", "test", "--all-targets", "--offline", "--target-dir", "/tmp/lwoodz-build"]
+timeout_secs = 300
+env = { CARGO_NET_OFFLINE = "true" }
+[[command]]
+name = "format"
+cmd = ["cargo", "fmt", "--all", "--", "--check"]
+timeout_secs = 30

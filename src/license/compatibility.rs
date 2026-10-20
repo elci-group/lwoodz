@@ -48,65 +48,104 @@ impl CompatibilityReport {
 
 /// Core compatibility rules — conservative, favors flagging over silence.
 /// Based on FSF/OSI guidance + SPDX compatibility data.
+///
+/// Both sides are parsed as SPDX expressions (see
+/// [`crate::license::spdx::parse_expression`]), so legacy `MIT/Apache-2.0`,
+/// parenthesised and mixed `AND`/`OR` expressions are evaluated with real
+/// precedence: a dependency `OR` is compatible when *any* branch is (the
+/// licensee picks), a dependency `AND` only when *every* part is.
 pub fn check_compatibility(project_license: &str, dep_license: &str) -> Compatibility {
+    use crate::license::spdx::{parse_expression, LicenseExpr};
+
     let proj = crate::license::spdx::normalize_spdx(project_license);
     let dep = crate::license::spdx::normalize_spdx(dep_license);
-
     if proj == dep {
         return Compatibility::Compatible;
     }
 
-    // Handle compound expressions (MIT OR Apache-2.0, etc.)
-    if dep.contains(" OR ") {
-        let parts: Vec<&str> = dep.split(" OR ").collect();
-        // If any alternative is compatible, the whole expression is compatible (choose best license)
-        let mut has_compatible = false;
-        let mut has_incompatible = false;
-        for part in &parts {
-            let c = check_compatibility(
-                project_license,
-                part.trim().trim_matches(|c| c == '(' || c == ')'),
-            );
-            if c == Compatibility::Compatible {
-                has_compatible = true;
-            }
-            if c == Compatibility::Incompatible {
-                has_incompatible = true;
-            }
-        }
-        if has_compatible {
-            return Compatibility::Compatible;
-        }
-        if has_incompatible
-            && parts.len()
-                == parts
-                    .iter()
-                    .filter(|p| {
-                        check_compatibility(project_license, p.trim())
-                            == Compatibility::Incompatible
-                    })
-                    .count()
-        {
-            return Compatibility::Incompatible;
-        }
-        return Compatibility::Warning;
+    // Project expression: the dependency must be compatible with every
+    // license the project is offered under.
+    if let Some(expr @ (LicenseExpr::Or(_) | LicenseExpr::And(_) | LicenseExpr::With(..))) =
+        parse_expression(&proj)
+    {
+        let ids = leaf_ids(&expr);
+        return ids
+            .iter()
+            .map(|p| check_compatibility(p, &dep))
+            .fold(Compatibility::Compatible, worst);
     }
-    if dep.contains(" AND ") {
-        let parts: Vec<&str> = dep.split(" AND ").collect();
-        let mut worst = Compatibility::Compatible;
-        for part in &parts {
-            let c = check_compatibility(
-                project_license,
-                part.trim().trim_matches(|c| c == '(' || c == ')'),
-            );
-            if c == Compatibility::Incompatible {
-                return Compatibility::Incompatible;
-            }
-            if c == Compatibility::Warning {
-                worst = Compatibility::Warning;
-            }
+
+    match parse_expression(&dep) {
+        Some(expr) => eval_dep(&proj, &expr),
+        None => check_single(&proj, &dep),
+    }
+}
+
+fn rank(c: Compatibility) -> u8 {
+    match c {
+        Compatibility::Compatible => 2,
+        Compatibility::Warning => 1,
+        Compatibility::Incompatible => 0,
+    }
+}
+
+fn worst(a: Compatibility, b: Compatibility) -> Compatibility {
+    if rank(a) <= rank(b) {
+        a
+    } else {
+        b
+    }
+}
+
+fn best(a: Compatibility, b: Compatibility) -> Compatibility {
+    if rank(a) >= rank(b) {
+        a
+    } else {
+        b
+    }
+}
+
+fn leaf_ids(expr: &crate::license::spdx::LicenseExpr) -> Vec<String> {
+    use crate::license::spdx::LicenseExpr;
+    match expr {
+        LicenseExpr::Id(id) => vec![id.clone()],
+        LicenseExpr::With(base, _) => leaf_ids(base),
+        LicenseExpr::And(parts) | LicenseExpr::Or(parts) => {
+            parts.iter().flat_map(leaf_ids).collect()
         }
-        return worst;
+    }
+}
+
+fn eval_dep(proj: &str, expr: &crate::license::spdx::LicenseExpr) -> Compatibility {
+    use crate::license::spdx::LicenseExpr;
+    match expr {
+        LicenseExpr::Id(id) => check_single(proj, id),
+        LicenseExpr::With(base, _) => eval_dep(proj, base),
+        LicenseExpr::Or(parts) => parts
+            .iter()
+            .map(|p| eval_dep(proj, p))
+            .fold(Compatibility::Incompatible, best),
+        LicenseExpr::And(parts) => parts
+            .iter()
+            .map(|p| eval_dep(proj, p))
+            .fold(Compatibility::Compatible, worst),
+    }
+}
+
+/// Single identifier vs single identifier.
+fn check_single(proj: &str, dep: &str) -> Compatibility {
+    let proj = proj.to_string();
+    let dep = dep.to_string();
+    if proj == dep {
+        return Compatibility::Compatible;
+    }
+
+    // Apache-2.0's patent-termination and indemnity terms are "further
+    // restrictions" under GPLv2 — incompatible even though Apache-2.0 is
+    // otherwise permissive, so this must be decided before the permissive
+    // shortcut below.
+    if matches!(proj.as_str(), "GPL-2.0-only" | "GPL-2.0") && dep == "Apache-2.0" {
+        return Compatibility::Incompatible;
     }
 
     // Permissive deps are compatible with almost everything.
@@ -121,6 +160,9 @@ pub fn check_compatibility(project_license: &str, dep_license: &str) -> Compatib
         "CC0-1.0",
         "Unlicense",
         "0BSD",
+        "MIT-0",
+        "Unicode-3.0",
+        "Unicode-DFS-2016",
     ];
     if permissive.contains(&dep.as_str()) {
         return Compatibility::Compatible;
@@ -325,6 +367,90 @@ mod tests {
         assert_eq!(
             check_compatibility("Apache-2.0", "GPL-3.0-only"),
             Compatibility::Compatible
+        );
+    }
+
+    /// Regression: deckhand's `lwoodz --check` flagged
+    /// `android_system_properties (MIT/Apache-2.0)` as COMPAT_WARNING against
+    /// an MIT project. The legacy slash form means OR; the licensee picks MIT.
+    #[test]
+    fn legacy_slash_dual_license_is_compatible_with_mit() {
+        for dep in [
+            "MIT/Apache-2.0",
+            "Apache-2.0/MIT",
+            "MIT / Apache-2.0",
+            "Apache-2.0 / MIT",
+            "MIT OR Apache-2.0",
+            "(MIT OR Apache-2.0)",
+            "mit or apache-2.0",
+            "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+            "(MIT OR Apache-2.0) AND Unicode-3.0",
+            "Unlicense/MIT",
+        ] {
+            assert_eq!(
+                check_compatibility("MIT", dep),
+                Compatibility::Compatible,
+                "{dep} should be compatible with MIT"
+            );
+        }
+        let r = build_report(
+            "MIT",
+            &[(
+                "android_system_properties".to_string(),
+                "MIT/Apache-2.0".to_string(),
+            )],
+        );
+        assert!(r.is_clean(), "{:?}", r.issues);
+    }
+
+    #[test]
+    fn or_is_compatible_if_any_branch_is_and_requires_all() {
+        assert_eq!(
+            check_compatibility("MIT", "GPL-3.0-only OR MIT"),
+            Compatibility::Compatible
+        );
+        assert_eq!(
+            check_compatibility("MIT", "GPL-3.0-only/GPL-2.0-only"),
+            Compatibility::Incompatible
+        );
+        // AND binds tighter than OR: this is MIT OR (Apache AND GPL) — MIT wins.
+        assert_eq!(
+            check_compatibility("MIT", "MIT OR Apache-2.0 AND GPL-3.0-only"),
+            Compatibility::Compatible
+        );
+        // ...but (MIT OR Apache) AND GPL requires the GPL part.
+        assert_eq!(
+            check_compatibility("MIT", "(MIT OR Apache-2.0) AND GPL-3.0-only"),
+            Compatibility::Incompatible
+        );
+        assert_eq!(
+            check_compatibility("MIT", "MPL-2.0 OR GPL-3.0-only"),
+            Compatibility::Warning
+        );
+    }
+
+    #[test]
+    fn gpl2_only_project_rejects_apache_dep() {
+        // Previously short-circuited to Compatible by the permissive shortcut.
+        assert_eq!(
+            check_compatibility("GPL-2.0-only", "Apache-2.0"),
+            Compatibility::Incompatible
+        );
+        assert_eq!(
+            check_compatibility("GPL-2.0-only", "MIT OR Apache-2.0"),
+            Compatibility::Compatible
+        );
+    }
+
+    #[test]
+    fn dual_licensed_project_requires_compat_with_each_branch() {
+        assert_eq!(
+            check_compatibility("MIT OR Apache-2.0", "BSD-3-Clause"),
+            Compatibility::Compatible
+        );
+        assert_eq!(
+            check_compatibility("MIT OR Apache-2.0", "GPL-3.0-only"),
+            Compatibility::Incompatible
         );
     }
 

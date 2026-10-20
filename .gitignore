@@ -1,1 +1,10 @@
 /target
+.azusa/
+.kaptaind/
+.lwoodz/
+.uni/
+.traci/
+.orb
+*.log
+.env
+.skillastic/

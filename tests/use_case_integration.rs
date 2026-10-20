@@ -80,6 +80,85 @@ fn jurisdiction_roles_and_aliases_survive_analysis() {
     assert!(!ids(&r.targets[0]).contains(&"TRANSFERS"));
 }
 #[test]
+fn age_gate_detection_and_required_measures_follow_declarations() {
+    let report = use_case::analyze(&sample()).unwrap();
+    let school = &report.targets[0];
+    assert_eq!(school.age_gate.minimum_age, Some(13));
+    assert!(
+        school.age_gate.blocked,
+        "children=true makes band breaches P0"
+    );
+    let codes: Vec<&str> = school
+        .age_gate
+        .findings
+        .iter()
+        .map(|f| f.code.as_str())
+        .collect();
+    assert!(codes.contains(&"BELOW_AUTHORIZATION_BAND"));
+    assert!(codes.contains(&"SELF_DECLARED_GATE_INSUFFICIENT"));
+    assert!(codes.contains(&"CHILD_PROTECTION_CODE_SCOPE"));
+    assert!(!codes.contains(&"AGE_GATE_MISSING"));
+    assert!(!codes.contains(&"AGE_SCOPE_UNKNOWN"));
+    assert_eq!(school.age_gate.bands.len(), 3);
+
+    let measure_ids: Vec<&str> = school
+        .required_measures
+        .iter()
+        .map(|m| m.id.as_str())
+        .collect();
+    for expected in [
+        "eu-transfer-safeguards",
+        "eu-child-authorization",
+        "uk-restricted-transfer-route",
+        "uk-child-authorization",
+        "uk-childrens-code",
+        "us-ca-minor-opt-in",
+        "us-ca-consumer-rights",
+    ] {
+        assert!(measure_ids.contains(&expected), "missing {expected}");
+    }
+    // COPPA is not triggered: the US is not among the declared jurisdictions.
+    assert!(!measure_ids.contains(&"us-coppa-parental-consent"));
+    // Declaring "US" surfaces COPPA with its certified safe harbor method.
+    let mut p = sample();
+    p.targets[0].user_jurisdictions = vec!["US".into()];
+    let us_report = use_case::analyze(&p).unwrap();
+    let coppa = us_report.targets[0]
+        .required_measures
+        .iter()
+        .find(|m| m.id == "us-coppa-parental-consent")
+        .unwrap();
+    assert!(coppa
+        .certified_methods
+        .iter()
+        .any(|m| m.id == "us-coppa-safe-harbor"));
+    // Transfer measures carry their certified instruments.
+    let transfer = school
+        .required_measures
+        .iter()
+        .find(|m| m.id == "eu-transfer-safeguards")
+        .unwrap();
+    assert!(transfer
+        .certified_methods
+        .iter()
+        .any(|m| m.id == "eu-scc-2021-914"));
+    // Child consent has no certified method on record; empty means "none
+    // maintained", not "optional".
+    let uk_child = school
+        .required_measures
+        .iter()
+        .find(|m| m.id == "uk-child-authorization")
+        .unwrap();
+    assert!(uk_child.certified_methods.is_empty());
+
+    // The offline SDK declares no personal data, no children, no transfers:
+    // no measures trigger and the age gate is clean.
+    let sdk = &report.targets[1];
+    assert!(sdk.age_gate.findings.is_empty());
+    assert!(!sdk.age_gate.blocked);
+    assert!(sdk.required_measures.is_empty());
+}
+#[test]
 fn cli_binaries_agree_and_do_not_write_to_target() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("profile.toml");
@@ -128,6 +207,11 @@ fn cli_binaries_agree_and_do_not_write_to_target() {
         "Residual risk:",
         "Acceptance:",
         "Jurisdiction",
+        "Age gate:",
+        "Age band",
+        "Age finding",
+        "Required measures:",
+        "Certified method",
         "References:",
     ] {
         assert!(text.contains(marker));
